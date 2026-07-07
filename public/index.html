@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ledger — Task Tracker</title>
+<style>
+  :root{
+    --bg:#1B1F27;
+    --panel:#242A34;
+    --panel-2:#2C333F;
+    --line:#3A4250;
+    --ink:#E9E7DF;
+    --ink-dim:#9BA3B2;
+    --amber:#E8A33D;
+    --blue:#5B8FF9;
+    --green:#4CB782;
+    --red:#E2685B;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+    --sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    min-height:100vh;
+  }
+  .app{
+    max-width:1100px;
+    margin:0 auto;
+    padding:32px 24px 60px;
+  }
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom:1px solid var(--line);
+    padding-bottom:18px;
+    margin-bottom:28px;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .title-block .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.18em;
+    color:var(--amber);
+    text-transform:uppercase;
+    margin:0 0 6px;
+  }
+  .title-block h1{
+    margin:0;
+    font-size:30px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+  }
+  .today{
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--ink-dim);
+  }
+  .view-toggle{
+    display:flex;
+    gap:2px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:3px;
+  }
+  .view-toggle button{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    background:transparent;
+    border:none;
+    color:var(--ink-dim);
+    padding:8px 16px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background .15s, color .15s;
+  }
+  .view-toggle button.active{
+    background:var(--panel-2);
+    color:var(--ink);
+  }
+
+  /* form panel */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:20px;
+    margin-bottom:28px;
+  }
+  .panel h2{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--ink-dim);
+    margin:0 0 16px;
+  }
+  .form-grid{
+    display:grid;
+    grid-template-columns:1.6fr 1fr 1fr 1fr;
+    gap:12px;
+    margin-bottom:12px;
+  }
+  .form-grid.notes-row{
+    grid-template-columns:1fr;
+  }
+  label{
+    display:block;
+    font-size:11px;
+    color:var(--ink-dim);
+    margin-bottom:5px;
+    font-family:var(--mono);
+    letter-spacing:0.03em;
+  }
+  input[type=text], input[type=date], select, textarea{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--line);
+    color:var(--ink);
+    border-radius:6px;
+    padding:9px 10px;
+    font-family:var(--sans);
+    font-size:14px;
+  }
+  textarea{
+    resize:vertical;
+    min-height:56px;
+    font-family:var(--sans);
+  }
+  input:focus, select:focus, textarea:focus{
+    outline:2px solid var(--blue);
+    outline-offset:1px;
+  }
+  .form-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+  }
+  button.primary{
+    background:var(--blue);
+    color:#0e131c;
+    border:none;
+    font-weight:600;
+    padding:10px 20px;
+    border-radius:7px;
+    cursor:pointer;
+    font-size:14px;
+  }
+  button.primary:hover{ filter:brightness(1.08); }
+  button.ghost{
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--ink-dim);
+    padding:10px 16px;
+    border-radius:7px;
+    cursor:pointer;
+    font-size:14px;
+  }
+  button.ghost:hover{ color:var(--ink); border-color:var(--ink-dim); }
+
+  /* status pill */
+  .pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    padding:4px 9px;
+    border-radius:100px;
+    white-space:nowrap;
+  }
+  .pill::before{ content:''; width:6px; height:6px; border-radius:50%; }
+  .pill.pending{ background:rgba(232,163,61,0.13); color:var(--amber); }
+  .pill.pending::before{ background:var(--amber); }
+  .pill.progress{ background:rgba(91,143,249,0.13); color:var(--blue); }
+  .pill.progress::before{ background:var(--blue); }
+  .pill.done{ background:rgba(76,183,130,0.13); color:var(--green); }
+  .pill.done::before{ background:var(--green); }
+
+  /* list view */
+  .log{
+    border-left:2px solid var(--line);
+    margin-left:6px;
+  }
+  .entry{
+    position:relative;
+    padding:14px 0 14px 26px;
+    border-bottom:1px solid var(--line);
+  }
+  .entry:last-child{ border-bottom:none; }
+  .entry::before{
+    content:'';
+    position:absolute;
+    left:-6px;
+    top:20px;
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    background:var(--panel-2);
+    border:2px solid var(--line);
+  }
+  .entry.pending::before{ border-color:var(--amber); }
+  .entry.progress::before{ border-color:var(--blue); }
+  .entry.done::before{ border-color:var(--green); }
+  .entry-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .entry-name{
+    font-size:16px;
+    font-weight:600;
+  }
+  .entry-dates{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--ink-dim);
+  }
+  .entry-notes{
+    margin-top:6px;
+    font-size:13.5px;
+    color:var(--ink-dim);
+    line-height:1.5;
+    white-space:pre-wrap;
+  }
+  .entry-actions{
+    margin-top:8px;
+    display:flex;
+    gap:8px;
+  }
+  .entry-actions button{
+    font-family:var(--mono);
+    font-size:11px;
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--ink-dim);
+    padding:4px 10px;
+    border-radius:5px;
+    cursor:pointer;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+  }
+  .entry-actions button:hover{ color:var(--ink); }
+  .entry-actions button.delete:hover{ color:var(--red); border-color:var(--red); }
+
+  .empty{
+    text-align:center;
+    padding:50px 20px;
+    color:var(--ink-dim);
+    font-family:var(--mono);
+    font-size:13px;
+  }
+
+  /* calendar view */
+  .cal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:16px;
+  }
+  .cal-header .month-label{
+    font-size:18px;
+    font-weight:700;
+  }
+  .cal-nav{ display:flex; gap:8px; }
+  .cal-nav button{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--ink);
+    width:32px; height:32px;
+    border-radius:6px;
+    cursor:pointer;
+    font-size:14px;
+  }
+  .cal-grid{
+    display:grid;
+    grid-template-columns:repeat(7,1fr);
+    gap:6px;
+  }
+  .cal-dow{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--ink-dim);
+    text-align:center;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    padding-bottom:4px;
+  }
+  .cal-grid-dow{
+    display:grid;
+    grid-template-columns:repeat(7,1fr);
+  }
+  .cal-dow{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--ink-dim);
+    text-align:center;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    padding-bottom:6px;
+  }
+  .cal-week{
+    position:relative;
+    margin-bottom:6px;
+  }
+  .cal-daycell{
+    position:absolute;
+    top:0;
+    background:var(--panel);
+    border:1px solid var(--line);
+    box-sizing:border-box;
+    cursor:pointer;
+    transition:background .12s;
+  }
+  .cal-daycell:hover{ background:var(--panel-2); }
+  .cal-daycell.outside{ opacity:0.4; }
+  .cal-daycell.today{ border-color:var(--blue); }
+  .cal-daynum{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--ink-dim);
+    padding:6px 8px 0;
+  }
+  .cal-bar{
+    position:absolute;
+    height:20px;
+    border-radius:4px;
+    font-size:10.5px;
+    color:#111;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    padding:0 8px;
+    overflow:hidden;
+    white-space:nowrap;
+    text-overflow:ellipsis;
+    cursor:pointer;
+    box-sizing:border-box;
+    z-index:2;
+  }
+  .cal-bar.pending{ background:var(--amber); }
+  .cal-bar.progress{ background:var(--blue); }
+  .cal-bar.done{ background:var(--green); }
+  .cal-bar.open-left{ border-top-left-radius:0; border-bottom-left-radius:0; }
+  .cal-bar.open-right{ border-top-right-radius:0; border-bottom-right-radius:0; }
+
+  .legend{
+    display:flex;
+    gap:16px;
+    margin-top:16px;
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--ink-dim);
+  }
+  .legend span{ display:flex; align-items:center; gap:6px; }
+  .legend .dot{ width:8px; height:8px; border-radius:50%; }
+
+  /* quick-add modal */
+  .modal-overlay{
+    position:fixed;
+    top:0; left:0; right:0; bottom:0;
+    background:rgba(10,12,16,0.6);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+  }
+  .modal-box{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:20px;
+    width:360px;
+    max-width:90vw;
+  }
+  .modal-box h3{
+    margin:0 0 14px;
+    font-size:15px;
+  }
+  .modal-box .modal-date{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--amber);
+    margin-bottom:14px;
+  }
+  .modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:14px;
+  }
+
+  .toolbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:14px;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  #searchBox{ flex:1; min-width:180px; }
+  select#filterStatus{ width:auto; }
+  .toolbar-right{ display:flex; gap:8px; }
+
+  /* task log entries */
+  .task-log{
+    margin-top:12px;
+    padding-top:10px;
+    border-top:1px dashed var(--line);
+  }
+  .task-log-title{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--ink-dim);
+    margin-bottom:8px;
+  }
+  .log-entry-item{
+    display:flex;
+    gap:10px;
+    padding:6px 0;
+    font-size:13px;
+  }
+  .log-entry-date{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--amber);
+    white-space:nowrap;
+    padding-top:1px;
+    min-width:78px;
+  }
+  .log-entry-text{
+    color:var(--ink);
+    line-height:1.5;
+    white-space:pre-wrap;
+    flex:1;
+  }
+  .log-add-row{
+    display:flex;
+    gap:8px;
+    margin-top:8px;
+    align-items:flex-start;
+  }
+  .log-add-row input[type=date]{
+    width:130px;
+    flex-shrink:0;
+  }
+  .log-add-row textarea{
+    flex:1;
+    min-height:38px;
+    font-size:13px;
+  }
+  .log-add-row button{
+    font-family:var(--mono);
+    font-size:11px;
+    text-transform:uppercase;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--ink);
+    padding:8px 14px;
+    border-radius:6px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .log-add-row button:hover{ border-color:var(--blue); }
+  mark{
+    background:rgba(232,163,61,0.35);
+    color:inherit;
+    border-radius:2px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="title-block">
+      <p class="eyebrow">Personal Work Log</p>
+      <h1>Ledger</h1>
+    </div>
+    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+      <div class="today" id="todayLabel"></div>
+      <div class="today" id="saveStatus" style="font-size:11px;"></div>
+      <div class="view-toggle">
+        <button id="btnListView" class="active">List</button>
+        <button id="btnCalView">Calendar</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="panel">
+    <h2>Log a task</h2>
+    <form id="taskForm">
+      <div class="form-grid">
+        <div>
+          <label for="f-name">Heading</label>
+          <input type="text" id="f-name" placeholder="e.g. Client proposal draft" required>
+        </div>
+        <div>
+          <label for="f-start">Start date</label>
+          <input type="date" id="f-start" required>
+        </div>
+        <div>
+          <label for="f-end">End date</label>
+          <input type="date" id="f-end">
+        </div>
+        <div>
+          <label for="f-status">Status</label>
+          <select id="f-status">
+            <option value="pending">Pending</option>
+            <option value="progress" selected>In progress</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid notes-row">
+        <div>
+          <label for="f-notes">Description</label>
+          <textarea id="f-notes" placeholder="What this task is about..."></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="ghost" id="btnClearForm">Clear</button>
+        <button type="submit" class="primary" id="btnSubmit">Add task</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="listView">
+    <div class="toolbar">
+      <input type="text" id="searchBox" placeholder="Search heading, description, or log entries…" style="max-width:340px;">
+      <select id="filterStatus">
+        <option value="all">All statuses</option>
+        <option value="pending">Pending</option>
+        <option value="progress">In progress</option>
+        <option value="done">Done</option>
+      </select>
+      <div class="toolbar-right">
+        <button class="ghost" id="btnExport">Export backup</button>
+        <button class="ghost" id="btnImport">Import backup</button>
+        <input type="file" id="fileImport" accept=".json" style="display:none;">
+      </div>
+    </div>
+    <div class="log" id="logContainer"></div>
+  </div>
+
+  <div id="calView" style="display:none;">
+    <div class="cal-header">
+      <div class="cal-nav">
+        <button id="calPrev">‹</button>
+        <button id="calNext">›</button>
+      </div>
+      <div class="month-label" id="calMonthLabel"></div>
+      <button class="ghost" id="calToday">Today</button>
+    </div>
+    <div class="cal-grid-dow" id="calDow"></div>
+    <div id="calWeeks" style="margin-top:6px;"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--amber)"></span>Pending</span>
+      <span><span class="dot" style="background:var(--blue)"></span>In progress</span>
+      <span><span class="dot" style="background:var(--green)"></span>Done</span>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalOverlay" style="display:none;">
+    <div class="modal-box">
+      <h3>Add task</h3>
+      <div class="modal-date" id="modalDateLabel"></div>
+      <label for="m-name">Heading</label>
+      <input type="text" id="m-name" placeholder="e.g. Client proposal draft" style="margin-bottom:10px;">
+      <label for="m-end">End date</label>
+      <input type="date" id="m-end" style="margin-bottom:10px;">
+      <label for="m-status">Status</label>
+      <select id="m-status">
+        <option value="pending">Pending</option>
+        <option value="progress" selected>In progress</option>
+        <option value="done">Done</option>
+      </select>
+      <div class="modal-actions">
+        <button class="ghost" id="modalCancel">Cancel</button>
+        <button class="primary" id="modalAdd">Add task</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const STORAGE_KEY = 'ledger_tasks_v1';
+  let tasks = [];
+  let editingId = null;
+  let calCursor = new Date();
+  calCursor.setDate(1);
+  let saveTimer = null;
+
+  const $ = id => document.getElementById(id);
+
+  async function loadTasks(){
+    try{
+      const res = await fetch('/api/data/' + STORAGE_KEY);
+      if(res.status === 404){ tasks = []; return; }
+      if(!res.ok) throw new Error('load failed');
+      const data = await res.json();
+      tasks = data.value ? JSON.parse(data.value) : [];
+      migrateTasks();
+    } catch(err){
+      tasks = [];
+      setSaveStatus('error', 'Could not load data — check server');
+    }
+  }
+
+  function migrateTasks(){
+    // Bring older saved tasks (name/notes, no log) up to the current shape.
+    tasks.forEach(t => {
+      if(t.log === undefined) t.log = [];
+      if(t.notes && !t.description) t.description = t.notes;
+    });
+  }
+
+  function save(){
+    // debounce so rapid edits don't spam the server
+    clearTimeout(saveTimer);
+    setSaveStatus('saving');
+    saveTimer = setTimeout(doSave, 400);
+  }
+
+  async function doSave(){
+    try{
+      const res = await fetch('/api/data/' + STORAGE_KEY, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ value: JSON.stringify(tasks) })
+      });
+      setSaveStatus(res.ok ? 'saved' : 'error');
+    } catch(err){
+      setSaveStatus('error');
+    }
+  }
+
+  function setSaveStatus(state, message){
+    const el = $('saveStatus');
+    if(!el) return;
+    if(state === 'saving'){ el.textContent = 'Saving…'; el.style.color = 'var(--ink-dim)'; }
+    else if(state === 'saved'){ el.textContent = 'Saved'; el.style.color = 'var(--green)'; }
+    else { el.textContent = message || 'Save failed — check connection'; el.style.color = 'var(--red)'; }
+  }
+
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+  function fmtDate(d){
+    if(!d) return '—';
+    const dt = new Date(d + 'T00:00:00');
+    return dt.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+  }
+
+  function statusLabel(s){
+    return s === 'pending' ? 'Pending' : s === 'done' ? 'Done' : 'In progress';
+  }
+
+  // ---- Today label ----
+  $('todayLabel').textContent = new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
+
+  // ---- Form handling ----
+  const form = $('taskForm');
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('f-name').value.trim();
+    const start = $('f-start').value;
+    const end = $('f-end').value;
+    const status = $('f-status').value;
+    const description = $('f-notes').value.trim();
+    if(!name || !start) return;
+
+    if(editingId){
+      const t = tasks.find(t => t.id === editingId);
+      Object.assign(t, {name, start, end, status, description});
+      editingId = null;
+      $('btnSubmit').textContent = 'Add task';
+    } else {
+      tasks.push({id: uid(), name, start, end, status, description, log: []});
+    }
+    save();
+    form.reset();
+    $('f-status').value = 'progress';
+    renderAll();
+  });
+
+  $('btnClearForm').addEventListener('click', () => {
+    form.reset();
+    $('f-status').value = 'progress';
+    editingId = null;
+    $('btnSubmit').textContent = 'Add task';
+  });
+
+  function editTask(id){
+    const t = tasks.find(t => t.id === id);
+    if(!t) return;
+    $('f-name').value = t.name;
+    $('f-start').value = t.start;
+    $('f-end').value = t.end || '';
+    $('f-status').value = t.status;
+    $('f-notes').value = t.description || '';
+    editingId = id;
+    $('btnSubmit').textContent = 'Save changes';
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  function deleteTask(id){
+    tasks = tasks.filter(t => t.id !== id);
+    save();
+    renderAll();
+  }
+
+  function addLogEntry(taskId, dateVal, textVal){
+    const t = tasks.find(t => t.id === taskId);
+    if(!t) return;
+    const text = (textVal || '').trim();
+    if(!text) return;
+    if(!t.log) t.log = [];
+    t.log.push({ id: uid(), date: dateVal || toISO(new Date()), text });
+    save();
+    renderAll();
+  }
+
+  function deleteLogEntry(taskId, entryId){
+    const t = tasks.find(t => t.id === taskId);
+    if(!t || !t.log) return;
+    t.log = t.log.filter(e => e.id !== entryId);
+    save();
+    renderAll();
+  }
+
+  // ---- List view ----
+  function taskMatchesSearch(t, q){
+    if(!q) return true;
+    const hay = [
+      t.name || '',
+      t.description || '',
+      ...(t.log || []).map(e => e.text)
+    ].join(' ').toLowerCase();
+    return hay.includes(q.toLowerCase());
+  }
+
+  function highlight(text, q){
+    if(!q) return escapeHtml(text);
+    const escaped = escapeHtml(text);
+    const escapedQ = escapeHtml(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return escaped.replace(new RegExp(escapedQ, 'ig'), match => `<mark>${match}</mark>`);
+  }
+
+  function renderList(){
+    const filter = $('filterStatus').value;
+    const query = ($('searchBox').value || '').trim();
+    const container = $('logContainer');
+    let items = [...tasks].sort((a,b) => (b.start || '').localeCompare(a.start || ''));
+    if(filter !== 'all') items = items.filter(t => t.status === filter);
+    if(query) items = items.filter(t => taskMatchesSearch(t, query));
+
+    if(items.length === 0){
+      container.innerHTML = `<div class="empty">${query || filter !== 'all' ? 'No tasks match.' : 'No tasks logged yet. Add one above to get started.'}</div>`;
+      return;
+    }
+
+    container.innerHTML = items.map(t => {
+      const log = (t.log || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
+      const logHtml = log.map(e => `
+        <div class="log-entry-item">
+          <div class="log-entry-date">${fmtDate(e.date)}</div>
+          <div class="log-entry-text">${highlight(e.text, query)}</div>
+          <button onclick="deleteLogEntry('${t.id}','${e.id}')" style="background:none;border:none;color:var(--ink-dim);cursor:pointer;font-size:11px;" title="Delete entry">✕</button>
+        </div>
+      `).join('');
+
+      return `
+      <div class="entry ${t.status}">
+        <div class="entry-top">
+          <div class="entry-name">${highlight(t.name, query)}</div>
+          <span class="pill ${t.status}">${statusLabel(t.status)}</span>
+        </div>
+        <div class="entry-dates">${fmtDate(t.start)} → ${fmtDate(t.end)}</div>
+        ${t.description ? `<div class="entry-notes">${highlight(t.description, query)}</div>` : ''}
+        <div class="entry-actions">
+          <button onclick="editTask('${t.id}')">Edit</button>
+          <button class="delete" onclick="deleteTask('${t.id}')">Delete</button>
+        </div>
+        <div class="task-log">
+          <div class="task-log-title">Task log</div>
+          ${logHtml || '<div style="color:var(--ink-dim); font-size:12.5px;">No updates logged yet.</div>'}
+          <div class="log-add-row">
+            <input type="date" id="log-date-${t.id}" value="${toISO(new Date())}">
+            <textarea id="log-text-${t.id}" placeholder="What did you do today?" rows="1"></textarea>
+            <button onclick="submitLogEntry('${t.id}')">Add entry</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function submitLogEntry(taskId){
+    const dateVal = $('log-date-' + taskId).value;
+    const textVal = $('log-text-' + taskId).value;
+    addLogEntry(taskId, dateVal, textVal);
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  $('filterStatus').addEventListener('change', renderList);
+  $('searchBox').addEventListener('input', renderList);
+
+  // ---- Export / Import ----
+  $('btnExport').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(tasks, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ledger-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  $('btnImport').addEventListener('click', () => $('fileImport').click());
+  $('fileImport').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try{
+        const imported = JSON.parse(evt.target.result);
+        if(Array.isArray(imported)){
+          tasks = imported;
+          save();
+          renderAll();
+        }
+      } catch(err){
+        alert('Could not read that file. Make sure it is a Ledger backup JSON file.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // ---- View toggle ----
+  $('btnListView').addEventListener('click', () => switchView('list'));
+  $('btnCalView').addEventListener('click', () => switchView('cal'));
+  function switchView(view){
+    $('listView').style.display = view === 'list' ? '' : 'none';
+    $('calView').style.display = view === 'cal' ? '' : 'none';
+    $('btnListView').classList.toggle('active', view === 'list');
+    $('btnCalView').classList.toggle('active', view === 'cal');
+    if(view === 'cal') renderCalendar();
+  }
+
+  // ---- Calendar view ----
+  const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  $('calDow').innerHTML = DOW.map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  const DAY_MS = 86400000;
+  const HEADER_H = 26;   // space reserved for the day number
+  const BAR_H = 22;      // height of each bar row (bar + gap)
+  const CELL_PAD_BOTTOM = 8;
+
+  function toISO(d){
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function parseISO(iso){ return new Date(iso + 'T00:00:00'); }
+  function diffDays(a,b){ return Math.round((b - a) / DAY_MS); }
+
+  function computeWeekLayout(weekDates){
+    const weekStartIso = toISO(weekDates[0]);
+    const weekEndIso = toISO(weekDates[6]);
+    const relevant = tasks
+      .filter(t => t.start && (t.end || t.start) >= weekStartIso && t.start <= weekEndIso)
+      .sort((a,b) => (a.start||'').localeCompare(b.start||''));
+
+    const lanes = [];
+    const segments = [];
+    relevant.forEach(t => {
+      const s = t.start;
+      const e = t.end || t.start;
+      const startCol = Math.max(0, diffDays(weekDates[0], parseISO(s)));
+      const endCol = Math.min(6, diffDays(weekDates[0], parseISO(e)));
+      let laneIdx = 0;
+      while(lanes[laneIdx] && lanes[laneIdx].some(iv => !(endCol < iv.startCol || startCol > iv.endCol))) laneIdx++;
+      if(!lanes[laneIdx]) lanes[laneIdx] = [];
+      lanes[laneIdx].push({startCol, endCol});
+      segments.push({
+        task: t, startCol, endCol, lane: laneIdx,
+        openLeft: s < weekStartIso,
+        openRight: e > weekEndIso
+      });
+    });
+    return { segments, laneCount: lanes.length };
+  }
+
+  function renderCalendar(){
+    const year = calCursor.getFullYear();
+    const month = calCursor.getMonth();
+    $('calMonthLabel').textContent = calCursor.toLocaleDateString('en-US', {month:'long', year:'numeric'});
+
+    const firstDay = new Date(year, month, 1);
+    const startOffset = firstDay.getDay();
+    const gridStart = new Date(year, month, 1 - startOffset);
+    const todayIso = toISO(new Date());
+    const colWidthPct = 100/7;
+
+    let weeksHtml = '';
+    for(let w=0; w<6; w++){
+      const weekDates = [];
+      for(let d=0; d<7; d++){
+        const dt = new Date(gridStart);
+        dt.setDate(gridStart.getDate() + w*7 + d);
+        weekDates.push(dt);
+      }
+      const { segments, laneCount } = computeWeekLayout(weekDates);
+      const weekHeight = HEADER_H + Math.max(laneCount,1)*BAR_H + CELL_PAD_BOTTOM;
+
+      let cellsHtml = '';
+      weekDates.forEach((dt, idx) => {
+        const iso = toISO(dt);
+        const outside = dt.getMonth() !== month;
+        const isToday = iso === todayIso;
+        cellsHtml += `<div class="cal-daycell ${outside ? 'outside':''} ${isToday ? 'today':''}"
+          style="left:${idx*colWidthPct}%; width:${colWidthPct}%; height:${weekHeight}px;"
+          onclick="openQuickAdd('${iso}')">
+          <div class="cal-daynum">${dt.getDate()}</div>
+        </div>`;
+      });
+
+      let barsHtml = '';
+      segments.forEach(seg => {
+        const left = seg.startCol*colWidthPct;
+        const width = (seg.endCol - seg.startCol + 1)*colWidthPct;
+        const top = HEADER_H + seg.lane*BAR_H;
+        barsHtml += `<div class="cal-bar ${seg.task.status} ${seg.openLeft?'open-left':''} ${seg.openRight?'open-right':''}"
+          style="left:${left}%; width:${width}%; top:${top}px;"
+          title="${escapeHtml(seg.task.name)}"
+          onclick="event.stopPropagation(); editTask('${seg.task.id}')">${escapeHtml(seg.task.name)}</div>`;
+      });
+
+      weeksHtml += `<div class="cal-week" style="height:${weekHeight}px;">${cellsHtml}${barsHtml}</div>`;
+    }
+    $('calWeeks').innerHTML = weeksHtml;
+  }
+
+  $('calPrev').addEventListener('click', () => { calCursor.setMonth(calCursor.getMonth()-1); renderCalendar(); });
+  $('calNext').addEventListener('click', () => { calCursor.setMonth(calCursor.getMonth()+1); renderCalendar(); });
+  $('calToday').addEventListener('click', () => { calCursor = new Date(); calCursor.setDate(1); renderCalendar(); });
+
+  // ---- Quick-add modal (click a calendar date) ----
+  let modalDateIso = null;
+  function openQuickAdd(iso){
+    modalDateIso = iso;
+    $('modalDateLabel').textContent = 'Start date: ' + fmtDate(iso);
+    $('m-name').value = '';
+    $('m-end').value = iso;
+    $('m-status').value = 'progress';
+    $('modalOverlay').style.display = 'flex';
+    setTimeout(() => $('m-name').focus(), 30);
+  }
+  function closeQuickAdd(){
+    $('modalOverlay').style.display = 'none';
+    modalDateIso = null;
+  }
+  $('modalCancel').addEventListener('click', closeQuickAdd);
+  $('modalOverlay').addEventListener('click', e => { if(e.target.id === 'modalOverlay') closeQuickAdd(); });
+  $('modalAdd').addEventListener('click', () => {
+    const name = $('m-name').value.trim();
+    if(!name || !modalDateIso) return;
+    const end = $('m-end').value || modalDateIso;
+    tasks.push({
+      id: uid(),
+      name,
+      start: modalDateIso,
+      end: end < modalDateIso ? modalDateIso : end,
+      status: $('m-status').value,
+      description: '',
+      log: []
+    });
+    save();
+    closeQuickAdd();
+    renderAll();
+  });
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape' && $('modalOverlay').style.display === 'flex') closeQuickAdd();
+  });
+
+  // default start date = today
+  $('f-start').value = toISO(new Date());
+
+  function renderAll(){
+    renderList();
+    if($('calView').style.display !== 'none') renderCalendar();
+  }
+
+  async function init(){
+    $('logContainer').innerHTML = '<div class="empty">Loading your saved tasks…</div>';
+    await loadTasks();
+    renderAll();
+  }
+
+  init();
+</script>
+</body>
+</html>
