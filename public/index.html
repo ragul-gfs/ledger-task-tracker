@@ -403,15 +403,50 @@
 
   .toolbar{
     display:flex;
-    justify-content:space-between;
     align-items:center;
     margin-bottom:14px;
     gap:10px;
     flex-wrap:wrap;
   }
   #searchBox{ flex:1; min-width:180px; }
-  select#filterStatus{ width:auto; }
-  .toolbar-right{ display:flex; gap:8px; }
+  .toolbar select, .toolbar input[type=number], .toolbar input[type=month], .toolbar input[type=date]{ width:auto; }
+  .toolbar-right{ display:flex; gap:8px; margin-left:auto; }
+
+  /* accordion entry header */
+  .entry-header{
+    cursor:pointer;
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .entry-header:hover .entry-name{ color:var(--blue); }
+  .entry-meta{
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    align-items:center;
+    margin-top:4px;
+  }
+  .entry-assigned{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--ink-dim);
+  }
+  .chevron{
+    font-family:var(--mono);
+    color:var(--ink-dim);
+    font-size:12px;
+    transition:transform .15s;
+    margin-left:8px;
+  }
+  .entry.expanded .chevron{ transform:rotate(90deg); }
+  .entry-body{
+    display:none;
+    margin-top:10px;
+  }
+  .entry.expanded .entry-body{ display:block; }
 
   /* task log entries */
   .task-log{
@@ -500,53 +535,25 @@
     </div>
   </header>
 
-  <div class="panel">
-    <h2>Log a task</h2>
-    <form id="taskForm">
-      <div class="form-grid">
-        <div>
-          <label for="f-name">Heading</label>
-          <input type="text" id="f-name" placeholder="e.g. Client proposal draft" required>
-        </div>
-        <div>
-          <label for="f-start">Start date</label>
-          <input type="date" id="f-start" required>
-        </div>
-        <div>
-          <label for="f-end">End date</label>
-          <input type="date" id="f-end">
-        </div>
-        <div>
-          <label for="f-status">Status</label>
-          <select id="f-status">
-            <option value="pending">Pending</option>
-            <option value="progress" selected>In progress</option>
-            <option value="done">Done</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-grid notes-row">
-        <div>
-          <label for="f-notes">Description</label>
-          <textarea id="f-notes" placeholder="What this task is about..."></textarea>
-        </div>
-      </div>
-      <div class="form-actions">
-        <button type="button" class="ghost" id="btnClearForm">Clear</button>
-        <button type="submit" class="primary" id="btnSubmit">Add task</button>
-      </div>
-    </form>
-  </div>
-
   <div id="listView">
     <div class="toolbar">
-      <input type="text" id="searchBox" placeholder="Search heading, description, or log entries…" style="max-width:340px;">
+      <button class="primary" id="btnCreateTask" style="flex-shrink:0;">+ Create task</button>
+      <input type="text" id="searchBox" placeholder="Search heading, description, or log entries…">
       <select id="filterStatus">
         <option value="all">All statuses</option>
         <option value="pending">Pending</option>
         <option value="progress">In progress</option>
         <option value="done">Done</option>
       </select>
+      <select id="filterPeriodType">
+        <option value="all">All time</option>
+        <option value="year">By year</option>
+        <option value="month">By month</option>
+        <option value="day">By exact date</option>
+      </select>
+      <input type="number" id="filterYear" placeholder="e.g. 2026" style="display:none; width:100px;">
+      <input type="month" id="filterMonth" style="display:none; width:150px;">
+      <input type="date" id="filterDay" style="display:none; width:150px;">
       <div class="toolbar-right">
         <button class="ghost" id="btnExport">Export backup</button>
         <button class="ghost" id="btnImport">Import backup</button>
@@ -576,21 +583,39 @@
 
   <div class="modal-overlay" id="modalOverlay" style="display:none;">
     <div class="modal-box">
-      <h3>Add task</h3>
+      <h3 id="modalTitle">Create task</h3>
       <div class="modal-date" id="modalDateLabel"></div>
+
       <label for="m-name">Heading</label>
       <input type="text" id="m-name" placeholder="e.g. Client proposal draft" style="margin-bottom:10px;">
-      <label for="m-end">End date</label>
-      <input type="date" id="m-end" style="margin-bottom:10px;">
+
+      <div style="display:flex; gap:10px; margin-bottom:10px;">
+        <div style="flex:1;">
+          <label for="m-start">Start date</label>
+          <input type="date" id="m-start">
+        </div>
+        <div style="flex:1;">
+          <label for="m-end">End date</label>
+          <input type="date" id="m-end">
+        </div>
+      </div>
+
+      <label for="m-assigned">Assigned by</label>
+      <input type="text" id="m-assigned" placeholder="e.g. Priya / Self" style="margin-bottom:10px;">
+
       <label for="m-status">Status</label>
-      <select id="m-status">
+      <select id="m-status" style="margin-bottom:10px;">
         <option value="pending">Pending</option>
         <option value="progress" selected>In progress</option>
         <option value="done">Done</option>
       </select>
+
+      <label for="m-description">Description</label>
+      <textarea id="m-description" placeholder="What this task is about..." style="margin-bottom:4px;"></textarea>
+
       <div class="modal-actions">
         <button class="ghost" id="modalCancel">Cancel</button>
-        <button class="primary" id="modalAdd">Add task</button>
+        <button class="primary" id="modalAdd">Create task</button>
       </div>
     </div>
   </div>
@@ -600,7 +625,6 @@
 <script>
   const STORAGE_KEY = 'ledger_tasks_v1';
   let tasks = [];
-  let editingId = null;
   let calCursor = new Date();
   calCursor.setDate(1);
   let saveTimer = null;
@@ -672,55 +696,92 @@
   // ---- Today label ----
   $('todayLabel').textContent = new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
 
-  // ---- Form handling ----
-  const form = $('taskForm');
-  form.addEventListener('submit', e => {
-    e.preventDefault();
-    const name = $('f-name').value.trim();
-    const start = $('f-start').value;
-    const end = $('f-end').value;
-    const status = $('f-status').value;
-    const description = $('f-notes').value.trim();
-    if(!name || !start) return;
+  // ---- Task modal (used for both "Create task" and editing an existing one) ----
+  let modalMode = 'create';   // 'create' | 'edit'
+  let modalEditId = null;
+  let modalPrefillStart = null;
+  const expandedIds = new Set();
 
-    if(editingId){
-      const t = tasks.find(t => t.id === editingId);
-      Object.assign(t, {name, start, end, status, description});
-      editingId = null;
-      $('btnSubmit').textContent = 'Add task';
+  function openTaskModal(mode, opts){
+    modalMode = mode;
+    opts = opts || {};
+    if(mode === 'edit'){
+      const t = tasks.find(t => t.id === opts.id);
+      if(!t) return;
+      modalEditId = t.id;
+      $('modalTitle').textContent = 'Edit task';
+      $('modalDateLabel').textContent = '';
+      $('m-name').value = t.name;
+      $('m-start').value = t.start;
+      $('m-end').value = t.end || '';
+      $('m-assigned').value = t.assignedBy || '';
+      $('m-status').value = t.status;
+      $('m-description').value = t.description || '';
+      $('modalAdd').textContent = 'Save changes';
     } else {
-      tasks.push({id: uid(), name, start, end, status, description, log: []});
+      modalEditId = null;
+      $('modalTitle').textContent = 'Create task';
+      $('modalDateLabel').textContent = '';
+      $('m-name').value = '';
+      $('m-start').value = opts.prefillStart || toISO(new Date());
+      $('m-end').value = opts.prefillStart || '';
+      $('m-assigned').value = '';
+      $('m-status').value = 'progress';
+      $('m-description').value = '';
+      $('modalAdd').textContent = 'Create task';
+    }
+    $('modalOverlay').style.display = 'flex';
+    setTimeout(() => $('m-name').focus(), 30);
+  }
+
+  function closeTaskModal(){
+    $('modalOverlay').style.display = 'none';
+    modalEditId = null;
+  }
+
+  $('btnCreateTask').addEventListener('click', () => openTaskModal('create'));
+  $('modalCancel').addEventListener('click', closeTaskModal);
+  $('modalOverlay').addEventListener('click', e => { if(e.target.id === 'modalOverlay') closeTaskModal(); });
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape' && $('modalOverlay').style.display === 'flex') closeTaskModal();
+  });
+
+  $('modalAdd').addEventListener('click', () => {
+    const name = $('m-name').value.trim();
+    const start = $('m-start').value;
+    if(!name || !start) return;
+    let end = $('m-end').value || start;
+    if(end < start) end = start;
+    const assignedBy = $('m-assigned').value.trim();
+    const status = $('m-status').value;
+    const description = $('m-description').value.trim();
+
+    if(modalMode === 'edit' && modalEditId){
+      const t = tasks.find(t => t.id === modalEditId);
+      Object.assign(t, {name, start, end, assignedBy, status, description});
+    } else {
+      const id = uid();
+      tasks.push({id, name, start, end, assignedBy, status, description, log: []});
+      expandedIds.add(id); // open it right away so they can start logging
     }
     save();
-    form.reset();
-    $('f-status').value = 'progress';
+    closeTaskModal();
     renderAll();
   });
 
-  $('btnClearForm').addEventListener('click', () => {
-    form.reset();
-    $('f-status').value = 'progress';
-    editingId = null;
-    $('btnSubmit').textContent = 'Add task';
-  });
-
-  function editTask(id){
-    const t = tasks.find(t => t.id === id);
-    if(!t) return;
-    $('f-name').value = t.name;
-    $('f-start').value = t.start;
-    $('f-end').value = t.end || '';
-    $('f-status').value = t.status;
-    $('f-notes').value = t.description || '';
-    editingId = id;
-    $('btnSubmit').textContent = 'Save changes';
-    window.scrollTo({top:0, behavior:'smooth'});
-  }
+  function editTask(id){ openTaskModal('edit', { id }); }
 
   function deleteTask(id){
     tasks = tasks.filter(t => t.id !== id);
+    expandedIds.delete(id);
     save();
     renderAll();
+  }
+
+  function toggleExpand(id){
+    if(expandedIds.has(id)) expandedIds.delete(id);
+    else expandedIds.add(id);
+    renderList();
   }
 
   function addLogEntry(taskId, dateVal, textVal){
@@ -748,9 +809,34 @@
     const hay = [
       t.name || '',
       t.description || '',
+      t.assignedBy || '',
       ...(t.log || []).map(e => e.text)
     ].join(' ').toLowerCase();
     return hay.includes(q.toLowerCase());
+  }
+
+  function taskMatchesPeriod(t){
+    const type = $('filterPeriodType').value;
+    if(type === 'all') return true;
+    const s = t.start;
+    const e = t.end || t.start;
+    if(!s) return false;
+    if(type === 'year'){
+      const y = $('filterYear').value;
+      if(!y) return true;
+      return s.slice(0,4) <= y && e.slice(0,4) >= y;
+    }
+    if(type === 'month'){
+      const m = $('filterMonth').value; // "YYYY-MM"
+      if(!m) return true;
+      return s.slice(0,7) <= m && e.slice(0,7) >= m;
+    }
+    if(type === 'day'){
+      const d = $('filterDay').value;
+      if(!d) return true;
+      return s <= d && e >= d;
+    }
+    return true;
   }
 
   function highlight(text, q){
@@ -767,41 +853,53 @@
     let items = [...tasks].sort((a,b) => (b.start || '').localeCompare(a.start || ''));
     if(filter !== 'all') items = items.filter(t => t.status === filter);
     if(query) items = items.filter(t => taskMatchesSearch(t, query));
+    items = items.filter(taskMatchesPeriod);
 
     if(items.length === 0){
-      container.innerHTML = `<div class="empty">${query || filter !== 'all' ? 'No tasks match.' : 'No tasks logged yet. Add one above to get started.'}</div>`;
+      container.innerHTML = `<div class="empty">${query || filter !== 'all' ? 'No tasks match.' : 'No tasks yet — click "+ Create task" to add one.'}</div>`;
       return;
     }
 
     container.innerHTML = items.map(t => {
+      const isOpen = expandedIds.has(t.id);
       const log = (t.log || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
       const logHtml = log.map(e => `
         <div class="log-entry-item">
           <div class="log-entry-date">${fmtDate(e.date)}</div>
           <div class="log-entry-text">${highlight(e.text, query)}</div>
-          <button onclick="deleteLogEntry('${t.id}','${e.id}')" style="background:none;border:none;color:var(--ink-dim);cursor:pointer;font-size:11px;" title="Delete entry">✕</button>
+          <button onclick="event.stopPropagation(); deleteLogEntry('${t.id}','${e.id}')" style="background:none;border:none;color:var(--ink-dim);cursor:pointer;font-size:11px;" title="Delete entry">✕</button>
         </div>
       `).join('');
 
       return `
-      <div class="entry ${t.status}">
-        <div class="entry-top">
-          <div class="entry-name">${highlight(t.name, query)}</div>
-          <span class="pill ${t.status}">${statusLabel(t.status)}</span>
+      <div class="entry ${t.status} ${isOpen ? 'expanded' : ''}">
+        <div class="entry-header entry-top" onclick="toggleExpand('${t.id}')">
+          <div>
+            <div class="entry-name">${highlight(t.name, query)}</div>
+            <div class="entry-meta">
+              <span class="entry-dates">${fmtDate(t.start)} → ${fmtDate(t.end)}</span>
+              ${t.assignedBy ? `<span class="entry-assigned">Assigned by: ${highlight(t.assignedBy, query)}</span>` : ''}
+            </div>
+          </div>
+          <div style="display:flex; align-items:center;">
+            <span class="pill ${t.status}">${statusLabel(t.status)}</span>
+            <span class="chevron">▶</span>
+          </div>
         </div>
-        <div class="entry-dates">${fmtDate(t.start)} → ${fmtDate(t.end)}</div>
-        ${t.description ? `<div class="entry-notes">${highlight(t.description, query)}</div>` : ''}
-        <div class="entry-actions">
-          <button onclick="editTask('${t.id}')">Edit</button>
-          <button class="delete" onclick="deleteTask('${t.id}')">Delete</button>
-        </div>
-        <div class="task-log">
-          <div class="task-log-title">Task log</div>
-          ${logHtml || '<div style="color:var(--ink-dim); font-size:12.5px;">No updates logged yet.</div>'}
-          <div class="log-add-row">
-            <input type="date" id="log-date-${t.id}" value="${toISO(new Date())}">
-            <textarea id="log-text-${t.id}" placeholder="What did you do today?" rows="1"></textarea>
-            <button onclick="submitLogEntry('${t.id}')">Add entry</button>
+        <div class="entry-body">
+          ${t.description ? `<div class="entry-notes">${highlight(t.description, query)}</div>` : ''}
+          <div class="entry-actions">
+            <button onclick="event.stopPropagation(); editTask('${t.id}')">Edit</button>
+            <button class="delete" onclick="event.stopPropagation(); deleteTask('${t.id}')">Delete</button>
+          </div>
+          <div class="task-log" onclick="event.stopPropagation()">
+            <div class="task-log-title">Task log</div>
+            ${logHtml || '<div style="color:var(--ink-dim); font-size:12.5px;">No updates logged yet.</div>'}
+            <div class="log-add-row">
+              <input type="date" id="log-date-${t.id}" value="${toISO(new Date())}">
+              <textarea id="log-text-${t.id}" placeholder="What did you do today?" rows="1"></textarea>
+              <button onclick="submitLogEntry('${t.id}')">Add entry</button>
+            </div>
           </div>
         </div>
       </div>`;
@@ -822,6 +920,20 @@
 
   $('filterStatus').addEventListener('change', renderList);
   $('searchBox').addEventListener('input', renderList);
+
+  $('filterPeriodType').addEventListener('change', () => {
+    const type = $('filterPeriodType').value;
+    $('filterYear').style.display = type === 'year' ? '' : 'none';
+    $('filterMonth').style.display = type === 'month' ? '' : 'none';
+    $('filterDay').style.display = type === 'day' ? '' : 'none';
+    if(type === 'year' && !$('filterYear').value) $('filterYear').value = new Date().getFullYear();
+    if(type === 'month' && !$('filterMonth').value) $('filterMonth').value = new Date().toISOString().slice(0,7);
+    if(type === 'day' && !$('filterDay').value) $('filterDay').value = toISO(new Date());
+    renderList();
+  });
+  $('filterYear').addEventListener('input', renderList);
+  $('filterMonth').addEventListener('input', renderList);
+  $('filterDay').addEventListener('input', renderList);
 
   // ---- Export / Import ----
   $('btnExport').addEventListener('click', () => {
@@ -962,46 +1074,9 @@
   $('calNext').addEventListener('click', () => { calCursor.setMonth(calCursor.getMonth()+1); renderCalendar(); });
   $('calToday').addEventListener('click', () => { calCursor = new Date(); calCursor.setDate(1); renderCalendar(); });
 
-  // ---- Quick-add modal (click a calendar date) ----
-  let modalDateIso = null;
   function openQuickAdd(iso){
-    modalDateIso = iso;
-    $('modalDateLabel').textContent = 'Start date: ' + fmtDate(iso);
-    $('m-name').value = '';
-    $('m-end').value = iso;
-    $('m-status').value = 'progress';
-    $('modalOverlay').style.display = 'flex';
-    setTimeout(() => $('m-name').focus(), 30);
+    openTaskModal('create', { prefillStart: iso });
   }
-  function closeQuickAdd(){
-    $('modalOverlay').style.display = 'none';
-    modalDateIso = null;
-  }
-  $('modalCancel').addEventListener('click', closeQuickAdd);
-  $('modalOverlay').addEventListener('click', e => { if(e.target.id === 'modalOverlay') closeQuickAdd(); });
-  $('modalAdd').addEventListener('click', () => {
-    const name = $('m-name').value.trim();
-    if(!name || !modalDateIso) return;
-    const end = $('m-end').value || modalDateIso;
-    tasks.push({
-      id: uid(),
-      name,
-      start: modalDateIso,
-      end: end < modalDateIso ? modalDateIso : end,
-      status: $('m-status').value,
-      description: '',
-      log: []
-    });
-    save();
-    closeQuickAdd();
-    renderAll();
-  });
-  document.addEventListener('keydown', e => {
-    if(e.key === 'Escape' && $('modalOverlay').style.display === 'flex') closeQuickAdd();
-  });
-
-  // default start date = today
-  $('f-start').value = toISO(new Date());
 
   function renderAll(){
     renderList();
