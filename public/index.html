@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <title>Ledger — Task Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#1B1F27;
@@ -15,6 +18,10 @@
     --blue:#5B8FF9;
     --green:#4CB782;
     --red:#E2685B;
+    --purple:#B47CDB;
+    --teal:#3FC7C0;
+    --pink:#F2789F;
+    --slate:#8FA6C4;
     --mono: 'JetBrains Mono', 'Courier New', monospace;
     --sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
   }
@@ -27,10 +34,156 @@
     min-height:100vh;
   }
   .app{
-    max-width:1100px;
+    max-width:1320px;
     margin:0 auto;
     padding:32px 24px 60px;
   }
+  .layout{
+    display:flex;
+    gap:28px;
+    align-items:flex-start;
+  }
+  .main-content{
+    flex:1;
+    min-width:0;
+  }
+  .sidebar{
+    width:230px;
+    flex-shrink:0;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:16px;
+    position:sticky;
+    top:20px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.18);
+  }
+  .sidebar-title{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--ink-dim);
+    margin:0 0 12px;
+  }
+  .project-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 10px;
+    border-radius:8px;
+    cursor:pointer;
+    margin-bottom:2px;
+    transition:background .12s;
+    position:relative;
+  }
+  .project-item:hover{ background:var(--panel-2); }
+  .project-item.active{ background:var(--panel-2); }
+  .project-item.active::before{
+    content:'';
+    position:absolute;
+    left:-16px;
+    top:8px;
+    bottom:8px;
+    width:3px;
+    border-radius:2px;
+    background:var(--blue);
+  }
+  .project-dot{
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    flex-shrink:0;
+  }
+  .project-name{
+    flex:1;
+    font-size:13.5px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .project-count{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--ink-dim);
+    flex-shrink:0;
+  }
+  .project-actions{
+    display:none;
+    gap:2px;
+    flex-shrink:0;
+  }
+  .project-item:hover .project-actions{ display:flex; }
+  .project-item:hover .project-count{ display:none; }
+  .project-actions button{
+    background:none;
+    border:none;
+    color:var(--ink-dim);
+    cursor:pointer;
+    font-size:11px;
+    padding:2px 4px;
+    border-radius:4px;
+  }
+  .project-actions button:hover{ color:var(--ink); background:var(--bg); }
+  .project-progress{
+    height:3px;
+    background:var(--bg);
+    border-radius:2px;
+    overflow:hidden;
+    margin:2px 10px 6px 29px;
+  }
+  .project-progress-fill{ height:100%; }
+  .btn-new-project{
+    width:100%;
+    margin-top:8px;
+    background:transparent;
+    border:1px dashed var(--line);
+    color:var(--ink-dim);
+    padding:9px 10px;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:12.5px;
+    text-align:left;
+  }
+  .btn-new-project:hover{ border-color:var(--blue); color:var(--ink); }
+
+  .project-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    font-family:var(--mono);
+    font-size:10.5px;
+    padding:2px 8px;
+    border-radius:100px;
+    background:var(--panel-2);
+  }
+  .project-chip .dot{ width:6px; height:6px; border-radius:50%; }
+
+  .color-swatch-row{
+    display:flex;
+    gap:8px;
+    margin-bottom:18px;
+    flex-wrap:wrap;
+  }
+  .color-swatch{
+    width:28px;
+    height:28px;
+    border-radius:50%;
+    cursor:pointer;
+    border:2px solid transparent;
+  }
+  .color-swatch.selected{ border-color:var(--ink); }
+
+  @media (max-width: 760px){
+    .layout{ flex-direction:column; }
+    .sidebar{
+      width:100%;
+      position:static;
+      display:flex;
+      flex-direction:column;
+    }
+  }
+
   header{
     display:flex;
     justify-content:space-between;
@@ -297,9 +450,13 @@
   }
   .entry{
     position:relative;
-    padding:14px 0 14px 26px;
+    padding:14px 10px 14px 26px;
+    margin-left:-10px;
     border-bottom:1px solid var(--line);
+    border-radius:8px;
+    transition:background .12s;
   }
+  .entry:hover{ background:rgba(255,255,255,0.015); }
   .entry:last-child{ border-bottom:none; }
   .entry::before{
     content:'';
@@ -551,9 +708,9 @@
     border-radius:9px;
     padding:10px 16px;
     cursor:pointer;
-    transition:border-color .15s, background .15s;
+    transition:border-color .15s, background .15s, transform .15s, box-shadow .15s;
   }
-  .stat-chip:hover{ border-color:var(--ink-dim); }
+  .stat-chip:hover{ border-color:var(--ink-dim); transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.2); }
   .stat-chip.active{ background:var(--panel-2); border-color:currentColor; }
   .stat-chip .stat-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
   .stat-chip .stat-num{ font-size:18px; font-weight:700; font-family:var(--mono); }
@@ -711,56 +868,66 @@
     </div>
   </header>
 
-  <div id="listView">
-    <div class="stats-bar" id="statsBar"></div>
-    <div class="toolbar">
-      <button class="primary" id="btnCreateTask" style="flex-shrink:0;" title="Shortcut: N">+ Create task</button>
-      <input type="text" id="searchBox" placeholder="Search... ( / to focus)">
-      <select id="filterStatus">
-        <option value="all">All statuses</option>
-        <option value="pending">Pending</option>
-        <option value="progress">In progress</option>
-        <option value="done">Done</option>
-      </select>
-      <select id="filterPeriodType">
-        <option value="all">All time</option>
-        <option value="year">By year</option>
-        <option value="month">By month</option>
-        <option value="day">By exact date</option>
-      </select>
-      <input type="number" id="filterYear" placeholder="e.g. 2026" style="display:none; width:100px;">
-      <input type="month" id="filterMonth" style="display:none; width:150px;">
-      <input type="date" id="filterDay" style="display:none; width:150px;">
-      <select id="sortOrder">
-        <option value="newest">Newest start first</option>
-        <option value="oldest">Oldest start first</option>
-        <option value="ending-soon">Ending soonest</option>
-        <option value="az">Heading A–Z</option>
-      </select>
-      <div class="toolbar-right">
-        <button class="ghost" id="btnExport">Export backup</button>
-        <button class="ghost" id="btnImport">Import backup</button>
-        <input type="file" id="fileImport" accept=".json" style="display:none;">
-      </div>
-    </div>
-    <div class="log" id="logContainer"></div>
-  </div>
+  <div class="layout">
+    <aside class="sidebar">
+      <p class="sidebar-title">Projects</p>
+      <div id="projectList"></div>
+      <button class="btn-new-project" id="btnNewProject">+ New project</button>
+    </aside>
 
-  <div id="calView" style="display:none;">
-    <div class="cal-header">
-      <div class="cal-nav">
-        <button id="calPrev">‹</button>
-        <button id="calNext">›</button>
+    <div class="main-content">
+      <div id="listView">
+        <div class="stats-bar" id="statsBar"></div>
+        <div class="toolbar">
+          <button class="primary" id="btnCreateTask" style="flex-shrink:0;" title="Shortcut: N">+ Create task</button>
+          <input type="text" id="searchBox" placeholder="Search... ( / to focus)">
+          <select id="filterStatus">
+            <option value="all">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="progress">In progress</option>
+            <option value="done">Done</option>
+          </select>
+          <select id="filterPeriodType">
+            <option value="all">All time</option>
+            <option value="year">By year</option>
+            <option value="month">By month</option>
+            <option value="day">By exact date</option>
+          </select>
+          <input type="number" id="filterYear" placeholder="e.g. 2026" style="display:none; width:100px;">
+          <input type="month" id="filterMonth" style="display:none; width:150px;">
+          <input type="date" id="filterDay" style="display:none; width:150px;">
+          <select id="sortOrder">
+            <option value="newest">Newest start first</option>
+            <option value="oldest">Oldest start first</option>
+            <option value="ending-soon">Ending soonest</option>
+            <option value="az">Heading A–Z</option>
+          </select>
+          <div class="toolbar-right">
+            <button class="ghost" id="btnExport">Export backup</button>
+            <button class="ghost" id="btnImport">Import backup</button>
+            <input type="file" id="fileImport" accept=".json" style="display:none;">
+          </div>
+        </div>
+        <div class="log" id="logContainer"></div>
       </div>
-      <div class="month-label" id="calMonthLabel"></div>
-      <button class="ghost" id="calToday">Today</button>
-    </div>
-    <div class="cal-grid-dow" id="calDow"></div>
-    <div id="calWeeks" style="margin-top:6px;"></div>
-    <div class="legend">
-      <span><span class="dot" style="background:var(--amber)"></span>Pending</span>
-      <span><span class="dot" style="background:var(--blue)"></span>In progress</span>
-      <span><span class="dot" style="background:var(--green)"></span>Done</span>
+
+      <div id="calView" style="display:none;">
+        <div class="cal-header">
+          <div class="cal-nav">
+            <button id="calPrev">‹</button>
+            <button id="calNext">›</button>
+          </div>
+          <div class="month-label" id="calMonthLabel"></div>
+          <button class="ghost" id="calToday">Today</button>
+        </div>
+        <div class="cal-grid-dow" id="calDow"></div>
+        <div id="calWeeks" style="margin-top:6px;"></div>
+        <div class="legend">
+          <span><span class="dot" style="background:var(--amber)"></span>Pending</span>
+          <span><span class="dot" style="background:var(--blue)"></span>In progress</span>
+          <span><span class="dot" style="background:var(--green)"></span>Done</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -802,6 +969,13 @@
       </div>
 
       <div class="modal-field">
+        <label for="m-project">Project</label>
+        <select id="m-project">
+          <option value="">No project</option>
+        </select>
+      </div>
+
+      <div class="modal-field">
         <label for="m-description">Description</label>
         <textarea id="m-description" placeholder="What this task is about..."></textarea>
       </div>
@@ -813,14 +987,42 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="projectModalOverlay" style="display:none;">
+    <div class="modal-box" style="width:420px;">
+      <h3 id="projectModalTitle">New project</h3>
+      <p class="modal-subtitle">Give it a name and a color to spot it by.</p>
+
+      <div class="modal-field">
+        <label for="p-name">Project name</label>
+        <input type="text" id="p-name" placeholder="e.g. Website Redesign">
+      </div>
+
+      <label>Color</label>
+      <div class="color-swatch-row" id="colorSwatchRow"></div>
+
+      <div class="modal-actions" style="justify-content:space-between;">
+        <button class="ghost" id="projectDelete" style="color:var(--red); display:none;">Delete project</button>
+        <div style="display:flex; gap:10px;">
+          <button class="ghost" id="projectModalCancel">Cancel</button>
+          <button class="primary" id="projectModalSave">Create project</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
   const STORAGE_KEY = 'ledger_tasks_v1';
+  const PROJECTS_KEY = 'ledger_projects_v1';
+  const PROJECT_COLORS = ['#E8A33D','#5B8FF9','#4CB782','#E2685B','#B47CDB','#3FC7C0','#F2789F','#8FA6C4'];
   let tasks = [];
+  let projects = [];
+  let selectedProjectId = 'all'; // 'all' | 'none' | a project id
   let calCursor = new Date();
   calCursor.setDate(1);
   let saveTimer = null;
+  let projectsSaveTimer = null;
 
   const $ = id => document.getElementById(id);
 
@@ -838,11 +1040,24 @@
     }
   }
 
+  async function loadProjects(){
+    try{
+      const res = await fetch('/api/data/' + PROJECTS_KEY);
+      if(res.status === 404){ projects = []; return; }
+      if(!res.ok) throw new Error('load failed');
+      const data = await res.json();
+      projects = data.value ? JSON.parse(data.value) : [];
+    } catch(err){
+      projects = [];
+    }
+  }
+
   function migrateTasks(){
-    // Bring older saved tasks (name/notes, no log) up to the current shape.
+    // Bring older saved tasks (name/notes, no log, no project) up to the current shape.
     tasks.forEach(t => {
       if(t.log === undefined) t.log = [];
       if(t.notes && !t.description) t.description = t.notes;
+      if(t.projectId === undefined) t.projectId = null;
     });
   }
 
@@ -859,6 +1074,25 @@
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ value: JSON.stringify(tasks) })
+      });
+      setSaveStatus(res.ok ? 'saved' : 'error');
+    } catch(err){
+      setSaveStatus('error');
+    }
+  }
+
+  function saveProjects(){
+    clearTimeout(projectsSaveTimer);
+    setSaveStatus('saving');
+    projectsSaveTimer = setTimeout(doSaveProjects, 400);
+  }
+
+  async function doSaveProjects(){
+    try{
+      const res = await fetch('/api/data/' + PROJECTS_KEY, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ value: JSON.stringify(projects) })
       });
       setSaveStatus(res.ok ? 'saved' : 'error');
     } catch(err){
@@ -907,6 +1141,13 @@
   let modalPrefillStart = null;
   const expandedIds = new Set();
 
+  function populateProjectDropdown(selectedId){
+    const sel = $('m-project');
+    sel.innerHTML = '<option value="">No project</option>' +
+      projects.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+    sel.value = selectedId || '';
+  }
+
   function openTaskModal(mode, opts){
     modalMode = mode;
     opts = opts || {};
@@ -923,6 +1164,7 @@
       $('m-assigned').value = t.assignedBy || '';
       $('m-status').value = t.status;
       $('m-description').value = t.description || '';
+      populateProjectDropdown(t.projectId);
       $('modalAdd').textContent = 'Save changes';
     } else {
       modalEditId = null;
@@ -935,6 +1177,9 @@
       $('m-assigned').value = '';
       $('m-status').value = 'progress';
       $('m-description').value = '';
+      // If a specific project is selected in the sidebar, default new tasks to it.
+      const prefillProject = (selectedProjectId !== 'all' && selectedProjectId !== 'none') ? selectedProjectId : '';
+      populateProjectDropdown(prefillProject);
       $('modalAdd').textContent = 'Create task';
     }
     $('modalOverlay').style.display = 'flex';
@@ -946,15 +1191,148 @@
     modalEditId = null;
   }
 
+  // ---- Projects: sidebar, CRUD, and filtering ----
+  let projectModalMode = 'create';
+  let projectModalEditId = null;
+  let projectModalSelectedColor = PROJECT_COLORS[0];
+
+  function renderColorSwatches(){
+    $('colorSwatchRow').innerHTML = PROJECT_COLORS.map(c => `
+      <div class="color-swatch ${c === projectModalSelectedColor ? 'selected' : ''}"
+           style="background:${c}" onclick="selectSwatchColor('${c}')"></div>
+    `).join('');
+  }
+
+  function selectSwatchColor(c){
+    projectModalSelectedColor = c;
+    renderColorSwatches();
+  }
+
+  function openProjectModal(mode, id){
+    projectModalMode = mode;
+    if(mode === 'edit'){
+      const p = projects.find(p => p.id === id);
+      if(!p) return;
+      projectModalEditId = id;
+      projectModalSelectedColor = p.color;
+      $('projectModalTitle').textContent = 'Edit project';
+      $('p-name').value = p.name;
+      $('projectModalSave').textContent = 'Save changes';
+      $('projectDelete').style.display = '';
+    } else {
+      projectModalEditId = null;
+      projectModalSelectedColor = PROJECT_COLORS[projects.length % PROJECT_COLORS.length];
+      $('projectModalTitle').textContent = 'New project';
+      $('p-name').value = '';
+      $('projectModalSave').textContent = 'Create project';
+      $('projectDelete').style.display = 'none';
+    }
+    renderColorSwatches();
+    $('projectModalOverlay').style.display = 'flex';
+    setTimeout(() => $('p-name').focus(), 30);
+  }
+
+  function closeProjectModal(){
+    $('projectModalOverlay').style.display = 'none';
+    projectModalEditId = null;
+  }
+
+  $('btnNewProject').addEventListener('click', () => openProjectModal('create'));
+  $('projectModalCancel').addEventListener('click', closeProjectModal);
+  $('projectModalOverlay').addEventListener('click', e => { if(e.target.id === 'projectModalOverlay') closeProjectModal(); });
+
+  $('projectModalSave').addEventListener('click', () => {
+    const name = $('p-name').value.trim();
+    if(!name) return;
+    if(projectModalMode === 'edit' && projectModalEditId){
+      const p = projects.find(p => p.id === projectModalEditId);
+      Object.assign(p, { name, color: projectModalSelectedColor });
+      showToast(`Saved project "${name}".`);
+    } else {
+      projects.push({ id: uid(), name, color: projectModalSelectedColor });
+      showToast(`Created project "${name}".`);
+    }
+    saveProjects();
+    closeProjectModal();
+    renderAll();
+  });
+
+  $('projectDelete').addEventListener('click', () => {
+    if(projectModalEditId) deleteProject(projectModalEditId);
+    closeProjectModal();
+  });
+
+  function deleteProject(id){
+    const idx = projects.findIndex(p => p.id === id);
+    if(idx === -1) return;
+    const [removed] = projects.splice(idx, 1);
+    const affectedIds = tasks.filter(t => t.projectId === id).map(t => t.id);
+    tasks.forEach(t => { if(t.projectId === id) t.projectId = null; });
+    if(selectedProjectId === id) selectedProjectId = 'all';
+    saveProjects();
+    save();
+    renderAll();
+    showToast(`Deleted project "${removed.name}" — its tasks moved to No project.`, 'Undo', () => {
+      projects.splice(idx, 0, removed);
+      tasks.forEach(t => { if(affectedIds.includes(t.id)) t.projectId = id; });
+      saveProjects();
+      save();
+      renderAll();
+    }, 6000);
+  }
+
+  function selectProject(id){
+    selectedProjectId = id;
+    renderAll();
+  }
+
+  function renderSidebar(){
+    const items = [
+      { id: 'all', name: 'All projects', color: 'var(--ink-dim)' },
+      { id: 'none', name: 'No project', color: 'var(--ink-dim)' },
+      ...projects
+    ];
+    $('projectList').innerHTML = items.map(p => {
+      const count = p.id === 'all'
+        ? tasks.length
+        : p.id === 'none'
+          ? tasks.filter(t => !t.projectId).length
+          : tasks.filter(t => t.projectId === p.id).length;
+
+      const isCustom = p.id !== 'all' && p.id !== 'none';
+      const doneCount = isCustom ? tasks.filter(t => t.projectId === p.id && t.status === 'done').length : 0;
+      const progressPct = isCustom && count > 0 ? Math.round((doneCount / count) * 100) : null;
+
+      return `
+        <div>
+          <div class="project-item ${selectedProjectId === p.id ? 'active' : ''}" onclick="selectProject('${p.id}')">
+            <span class="project-dot" style="background:${p.color}"></span>
+            <span class="project-name">${escapeHtml(p.name)}</span>
+            <span class="project-count">${count}</span>
+            ${isCustom ? `
+              <div class="project-actions">
+                <button onclick="event.stopPropagation(); openProjectModal('edit','${p.id}')" title="Edit">✎</button>
+              </div>
+            ` : ''}
+          </div>
+          ${progressPct !== null ? `<div class="project-progress"><div class="project-progress-fill" style="width:${progressPct}%; background:${p.color}"></div></div>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
   $('btnCreateTask').addEventListener('click', () => openTaskModal('create'));
   $('modalCancel').addEventListener('click', closeTaskModal);
   $('modalOverlay').addEventListener('click', e => { if(e.target.id === 'modalOverlay') closeTaskModal(); });
   document.addEventListener('keydown', e => {
-    if(e.key === 'Escape' && $('modalOverlay').style.display === 'flex'){ closeTaskModal(); return; }
+    if(e.key === 'Escape'){
+      if($('modalOverlay').style.display === 'flex'){ closeTaskModal(); return; }
+      if($('projectModalOverlay').style.display === 'flex'){ closeProjectModal(); return; }
+    }
 
     const tag = (document.activeElement && document.activeElement.tagName) || '';
     const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-    const modalOpen = $('modalOverlay').style.display === 'flex';
+    const modalOpen = $('modalOverlay').style.display === 'flex' || $('projectModalOverlay').style.display === 'flex';
     if(modalOpen || typing) return;
 
     if(e.key === '/'){
@@ -975,17 +1353,18 @@
     const assignedBy = $('m-assigned').value.trim();
     const status = $('m-status').value;
     const description = $('m-description').value.trim();
+    const projectId = $('m-project').value || null;
 
     if(modalMode === 'edit' && modalEditId){
       const t = tasks.find(t => t.id === modalEditId);
-      Object.assign(t, {name, start, end, assignedBy, status, description});
+      Object.assign(t, {name, start, end, assignedBy, status, description, projectId});
       save();
       closeTaskModal();
       renderAll();
       showToast(`Saved changes to "${name}".`);
     } else {
       const id = uid();
-      tasks.push({id, name, start, end, assignedBy, status, description, log: []});
+      tasks.push({id, name, start, end, assignedBy, status, description, projectId, log: []});
       expandedIds.add(id); // open it right away so they can start logging
       save();
       closeTaskModal();
@@ -1136,12 +1515,14 @@
   }
 
   function getBaseFilteredTasks(){
-    // "base" = filtered by search + period, but NOT by status —
-    // so the stat chips can show what each status would total within the current period/search.
+    // "base" = filtered by search + period + selected project, but NOT by status —
+    // so the stat chips can show what each status would total within the current view.
     const query = ($('searchBox').value || '').trim();
     let items = [...tasks];
     if(query) items = items.filter(t => taskMatchesSearch(t, query));
     items = items.filter(taskMatchesPeriod);
+    if(selectedProjectId === 'none') items = items.filter(t => !t.projectId);
+    else if(selectedProjectId !== 'all') items = items.filter(t => t.projectId === selectedProjectId);
     return items;
   }
 
@@ -1210,6 +1591,8 @@
 
       const overdue = t.end && t.end < toISO(new Date()) && t.status !== 'done';
       const progressPct = timeProgressPercent(t);
+      const taskProject = t.projectId ? projects.find(p => p.id === t.projectId) : null;
+      const showProjectChip = selectedProjectId === 'all' || selectedProjectId === 'none';
 
       return `
       <div class="entry ${t.status} ${isOpen ? 'expanded' : ''}">
@@ -1219,6 +1602,7 @@
             <div class="entry-meta">
               <span class="entry-dates">${fmtDate(t.start)} → ${fmtDate(t.end)}</span>
               ${t.assignedBy ? `<span class="entry-assigned">Assigned by: ${highlight(t.assignedBy, query)}</span>` : ''}
+              ${showProjectChip && taskProject ? `<span class="project-chip"><span class="dot" style="background:${taskProject.color}"></span>${escapeHtml(taskProject.name)}</span>` : ''}
               ${overdue ? `<span class="overdue-badge">Overdue</span>` : ''}
             </div>
             ${progressPct !== null ? `<div class="progress-track"><div class="progress-fill ${t.status}" style="width:${progressPct}%"></div></div>` : ''}
@@ -1346,6 +1730,11 @@
     const weekEndIso = toISO(weekDates[6]);
     const relevant = tasks
       .filter(t => t.start && (t.end || t.start) >= weekStartIso && t.start <= weekEndIso)
+      .filter(t => {
+        if(selectedProjectId === 'all') return true;
+        if(selectedProjectId === 'none') return !t.projectId;
+        return t.projectId === selectedProjectId;
+      })
       .sort((a,b) => (a.start||'').localeCompare(b.start||''));
 
     const lanes = [];
@@ -1427,13 +1816,14 @@
   }
 
   function renderAll(){
+    renderSidebar();
     renderList();
     if($('calView').style.display !== 'none') renderCalendar();
   }
 
   async function init(){
     $('logContainer').innerHTML = '<div class="empty">Loading your saved tasks…</div>';
-    await loadTasks();
+    await Promise.all([loadTasks(), loadProjects()]);
     renderAll();
   }
 
