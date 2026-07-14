@@ -186,6 +186,41 @@
   .pill.done{ background:rgba(76,183,130,0.13); color:var(--green); }
   .pill.done::before{ background:var(--green); }
 
+  /* inline-editable status dropdown, styled to look like a pill */
+  .pill-select{
+    appearance:none;
+    -webkit-appearance:none;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    padding:6px 26px 6px 12px;
+    border-radius:100px;
+    border:1px solid transparent;
+    cursor:pointer;
+    background-repeat:no-repeat;
+    background-position:right 9px center;
+    background-size:9px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path d='M0 0L5 6L10 0' fill='none' stroke='%239BA3B2' stroke-width='1.4'/></svg>");
+  }
+  .pill-select:hover{ border-color:var(--line); }
+  .pill-select:focus{ outline:none; border-color:currentColor; }
+  .pill-select.pending{ background-color:rgba(232,163,61,0.13); color:var(--amber); }
+  .pill-select.progress{ background-color:rgba(91,143,249,0.13); color:var(--blue); }
+  .pill-select.done{ background-color:rgba(76,183,130,0.13); color:var(--green); }
+  .pill-select option{ background:var(--panel-2); color:var(--ink); }
+
+  .overdue-badge{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    color:var(--red);
+    border:1px solid var(--red);
+    border-radius:100px;
+    padding:2px 8px;
+  }
+
   /* list view */
   .log{
     border-left:2px solid var(--line);
@@ -379,14 +414,23 @@
   .modal-box{
     background:var(--panel);
     border:1px solid var(--line);
-    border-radius:10px;
-    padding:20px;
-    width:360px;
-    max-width:90vw;
+    border-radius:14px;
+    padding:32px;
+    width:640px;
+    max-width:94vw;
+    max-height:88vh;
+    overflow-y:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,0.45);
   }
   .modal-box h3{
-    margin:0 0 14px;
-    font-size:15px;
+    margin:0 0 4px;
+    font-size:22px;
+    font-weight:700;
+  }
+  .modal-box .modal-subtitle{
+    font-size:13px;
+    color:var(--ink-dim);
+    margin:0 0 22px;
   }
   .modal-box .modal-date{
     font-family:var(--mono);
@@ -394,12 +438,57 @@
     color:var(--amber);
     margin-bottom:14px;
   }
+  .modal-box label{
+    font-size:12px;
+    margin-bottom:6px;
+  }
+  .modal-box input, .modal-box select, .modal-box textarea{
+    font-size:14.5px;
+    padding:11px 12px;
+  }
+  .modal-box textarea{ min-height:90px; }
+  .modal-field{ margin-bottom:16px; }
+  .modal-row{
+    display:flex;
+    gap:14px;
+    margin-bottom:16px;
+  }
+  .modal-row > div{ flex:1; }
   .modal-actions{
     display:flex;
     justify-content:flex-end;
     gap:10px;
-    margin-top:14px;
+    margin-top:22px;
+    padding-top:18px;
+    border-top:1px solid var(--line);
   }
+  .modal-actions button{
+    padding:11px 22px;
+    font-size:14px;
+  }
+
+  .stats-bar{
+    display:flex;
+    gap:10px;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+  }
+  .stat-chip{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:10px 16px;
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .stat-chip:hover{ border-color:var(--ink-dim); }
+  .stat-chip.active{ background:var(--panel-2); border-color:currentColor; }
+  .stat-chip .stat-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .stat-chip .stat-num{ font-size:18px; font-weight:700; font-family:var(--mono); }
+  .stat-chip .stat-label{ font-size:11px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:0.04em; font-family:var(--mono); }
 
   .toolbar{
     display:flex;
@@ -553,6 +642,7 @@
   </header>
 
   <div id="listView">
+    <div class="stats-bar" id="statsBar"></div>
     <div class="toolbar">
       <button class="primary" id="btnCreateTask" style="flex-shrink:0;">+ Create task</button>
       <input type="text" id="searchBox" placeholder="Search heading, description, or log entries…">
@@ -571,6 +661,12 @@
       <input type="number" id="filterYear" placeholder="e.g. 2026" style="display:none; width:100px;">
       <input type="month" id="filterMonth" style="display:none; width:150px;">
       <input type="date" id="filterDay" style="display:none; width:150px;">
+      <select id="sortOrder">
+        <option value="newest">Newest start first</option>
+        <option value="oldest">Oldest start first</option>
+        <option value="ending-soon">Ending soonest</option>
+        <option value="az">Heading A–Z</option>
+      </select>
       <div class="toolbar-right">
         <button class="ghost" id="btnExport">Export backup</button>
         <button class="ghost" id="btnImport">Import backup</button>
@@ -601,34 +697,44 @@
   <div class="modal-overlay" id="modalOverlay" style="display:none;">
     <div class="modal-box">
       <h3 id="modalTitle">Create task</h3>
+      <p class="modal-subtitle" id="modalSubtitle">Fill in the details below.</p>
       <div class="modal-date" id="modalDateLabel"></div>
 
-      <label for="m-name">Heading</label>
-      <input type="text" id="m-name" placeholder="e.g. Client proposal draft" style="margin-bottom:10px;">
+      <div class="modal-field">
+        <label for="m-name">Heading</label>
+        <input type="text" id="m-name" placeholder="e.g. Client proposal draft">
+      </div>
 
-      <div style="display:flex; gap:10px; margin-bottom:10px;">
-        <div style="flex:1;">
+      <div class="modal-row">
+        <div>
           <label for="m-start">Start date</label>
           <input type="date" id="m-start">
         </div>
-        <div style="flex:1;">
+        <div>
           <label for="m-end">End date</label>
           <input type="date" id="m-end">
         </div>
       </div>
 
-      <label for="m-assigned">Assigned by</label>
-      <input type="text" id="m-assigned" placeholder="e.g. Priya / Self" style="margin-bottom:10px;">
+      <div class="modal-row">
+        <div>
+          <label for="m-assigned">Assigned by</label>
+          <input type="text" id="m-assigned" placeholder="e.g. Priya / Self">
+        </div>
+        <div>
+          <label for="m-status">Status</label>
+          <select id="m-status">
+            <option value="pending">Pending</option>
+            <option value="progress" selected>In progress</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+      </div>
 
-      <label for="m-status">Status</label>
-      <select id="m-status" style="margin-bottom:10px;">
-        <option value="pending">Pending</option>
-        <option value="progress" selected>In progress</option>
-        <option value="done">Done</option>
-      </select>
-
-      <label for="m-description">Description</label>
-      <textarea id="m-description" placeholder="What this task is about..." style="margin-bottom:4px;"></textarea>
+      <div class="modal-field">
+        <label for="m-description">Description</label>
+        <textarea id="m-description" placeholder="What this task is about..."></textarea>
+      </div>
 
       <div class="modal-actions">
         <button class="ghost" id="modalCancel">Cancel</button>
@@ -727,6 +833,7 @@
       if(!t) return;
       modalEditId = t.id;
       $('modalTitle').textContent = 'Edit task';
+      $('modalSubtitle').textContent = 'Update the details, then save.';
       $('modalDateLabel').textContent = '';
       $('m-name').value = t.name;
       $('m-start').value = t.start;
@@ -738,6 +845,7 @@
     } else {
       modalEditId = null;
       $('modalTitle').textContent = 'Create task';
+      $('modalSubtitle').textContent = 'Fill in the details below.';
       $('modalDateLabel').textContent = '';
       $('m-name').value = '';
       $('m-start').value = opts.prefillStart || toISO(new Date());
@@ -787,6 +895,14 @@
   });
 
   function editTask(id){ openTaskModal('edit', { id }); }
+
+  function updateTaskStatus(id, newStatus){
+    const t = tasks.find(t => t.id === id);
+    if(!t) return;
+    t.status = newStatus;
+    save();
+    renderAll();
+  }
 
   function deleteTask(id){
     tasks = tasks.filter(t => t.id !== id);
@@ -876,14 +992,49 @@
     return escaped.replace(new RegExp(escapedQ, 'ig'), match => `<mark>${match}</mark>`);
   }
 
+  function renderStatsBar(){
+    const counts = { all: tasks.length, pending: 0, progress: 0, done: 0 };
+    tasks.forEach(t => { if(counts[t.status] !== undefined) counts[t.status]++; });
+    const current = $('filterStatus').value;
+    const chips = [
+      { key: 'all', label: 'All tasks', color: 'var(--ink-dim)' },
+      { key: 'pending', label: 'Pending', color: 'var(--amber)' },
+      { key: 'progress', label: 'In progress', color: 'var(--blue)' },
+      { key: 'done', label: 'Done', color: 'var(--green)' },
+    ];
+    $('statsBar').innerHTML = chips.map(c => `
+      <div class="stat-chip ${current === c.key ? 'active' : ''}" style="color:${c.color}" onclick="setStatusFilter('${c.key}')">
+        <span class="stat-dot" style="background:${c.color}"></span>
+        <span class="stat-num">${counts[c.key]}</span>
+        <span class="stat-label">${c.label}</span>
+      </div>
+    `).join('');
+  }
+
+  function setStatusFilter(key){
+    $('filterStatus').value = key;
+    renderList();
+  }
+
+  function sortItems(items, order){
+    const byStart = (a,b) => (a.start || '').localeCompare(b.start || '');
+    if(order === 'oldest') return items.sort(byStart);
+    if(order === 'ending-soon') return items.sort((a,b) => (a.end || a.start || '').localeCompare(b.end || b.start || ''));
+    if(order === 'az') return items.sort((a,b) => (a.name || '').localeCompare(b.name || ''));
+    return items.sort((a,b) => -byStart(a,b)); // newest start first (default)
+  }
+
   function renderList(){
+    renderStatsBar();
     const filter = $('filterStatus').value;
     const query = ($('searchBox').value || '').trim();
+    const sortOrder = $('sortOrder').value;
     const container = $('logContainer');
-    let items = [...tasks].sort((a,b) => (b.start || '').localeCompare(a.start || ''));
+    let items = [...tasks];
     if(filter !== 'all') items = items.filter(t => t.status === filter);
     if(query) items = items.filter(t => taskMatchesSearch(t, query));
     items = items.filter(taskMatchesPeriod);
+    items = sortItems(items, sortOrder);
 
     if(items.length === 0){
       container.innerHTML = `<div class="empty">${query || filter !== 'all' ? 'No tasks match.' : 'No tasks yet — click "+ Create task" to add one.'}</div>`;
@@ -905,6 +1056,8 @@
         </div>
       `).join('');
 
+      const overdue = t.end && t.end < toISO(new Date()) && t.status !== 'done';
+
       return `
       <div class="entry ${t.status} ${isOpen ? 'expanded' : ''}">
         <div class="entry-header entry-top" onclick="toggleExpand('${t.id}')">
@@ -913,10 +1066,15 @@
             <div class="entry-meta">
               <span class="entry-dates">${fmtDate(t.start)} → ${fmtDate(t.end)}</span>
               ${t.assignedBy ? `<span class="entry-assigned">Assigned by: ${highlight(t.assignedBy, query)}</span>` : ''}
+              ${overdue ? `<span class="overdue-badge">Overdue</span>` : ''}
             </div>
           </div>
-          <div style="display:flex; align-items:center;">
-            <span class="pill ${t.status}">${statusLabel(t.status)}</span>
+          <div style="display:flex; align-items:center;" onclick="event.stopPropagation()">
+            <select class="status-select pill-select ${t.status}" onchange="updateTaskStatus('${t.id}', this.value)">
+              <option value="pending" ${t.status==='pending'?'selected':''}>Pending</option>
+              <option value="progress" ${t.status==='progress'?'selected':''}>In progress</option>
+              <option value="done" ${t.status==='done'?'selected':''}>Done</option>
+            </select>
             <span class="chevron">▶</span>
           </div>
         </div>
@@ -954,6 +1112,7 @@
 
   $('filterStatus').addEventListener('change', renderList);
   $('searchBox').addEventListener('input', renderList);
+  $('sortOrder').addEventListener('change', renderList);
 
   $('filterPeriodType').addEventListener('change', () => {
     const type = $('filterPeriodType').value;
