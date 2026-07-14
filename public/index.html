@@ -221,6 +221,75 @@
     padding:2px 8px;
   }
 
+  /* time-elapsed progress bar */
+  .progress-track{
+    height:4px;
+    background:var(--bg);
+    border-radius:3px;
+    overflow:hidden;
+    margin-top:8px;
+    width:100%;
+    max-width:220px;
+  }
+  .progress-fill{
+    height:100%;
+    border-radius:3px;
+  }
+  .progress-fill.pending{ background:var(--amber); }
+  .progress-fill.progress{ background:var(--blue); }
+  .progress-fill.done{ background:var(--green); }
+
+  /* toasts */
+  .toast-container{
+    position:fixed;
+    bottom:24px;
+    right:24px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    z-index:100;
+  }
+  .toast{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:12px 16px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.4);
+    font-size:13.5px;
+    animation:toastIn .18s ease-out;
+    max-width:340px;
+  }
+  @keyframes toastIn{
+    from{ opacity:0; transform:translateY(8px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  .toast button{
+    font-family:var(--mono);
+    font-size:11.5px;
+    text-transform:uppercase;
+    background:none;
+    border:none;
+    color:var(--blue);
+    cursor:pointer;
+    white-space:nowrap;
+    padding:0;
+  }
+  .toast button:hover{ text-decoration:underline; }
+
+  /* keyboard shortcut hints */
+  .kbd-hint{
+    font-family:var(--mono);
+    font-size:10px;
+    color:var(--ink-dim);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:1px 5px;
+    margin-left:6px;
+  }
+
   /* list view */
   .log{
     border-left:2px solid var(--line);
@@ -624,6 +693,7 @@
 </style>
 </head>
 <body>
+<div class="toast-container" id="toastContainer"></div>
 <div class="app">
 
   <header>
@@ -644,8 +714,8 @@
   <div id="listView">
     <div class="stats-bar" id="statsBar"></div>
     <div class="toolbar">
-      <button class="primary" id="btnCreateTask" style="flex-shrink:0;">+ Create task</button>
-      <input type="text" id="searchBox" placeholder="Search heading, description, or log entries…">
+      <button class="primary" id="btnCreateTask" style="flex-shrink:0;" title="Shortcut: N">+ Create task</button>
+      <input type="text" id="searchBox" placeholder="Search... ( / to focus)">
       <select id="filterStatus">
         <option value="all">All statuses</option>
         <option value="pending">Pending</option>
@@ -816,6 +886,18 @@
     return s === 'pending' ? 'Pending' : s === 'done' ? 'Done' : 'In progress';
   }
 
+  function timeProgressPercent(t){
+    // Returns null when there's nothing meaningful to show (no range, or a single-day task).
+    if(!t.start || !t.end || t.end === t.start) return null;
+    if(t.status === 'done') return 100;
+    const start = new Date(t.start + 'T00:00:00').getTime();
+    const end = new Date(t.end + 'T00:00:00').getTime();
+    const now = Date.now();
+    if(now <= start) return 0;
+    if(now >= end) return 100;
+    return Math.round(((now - start) / (end - start)) * 100);
+  }
+
   // ---- Today label ----
   $('todayLabel').textContent = new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
 
@@ -868,7 +950,20 @@
   $('modalCancel').addEventListener('click', closeTaskModal);
   $('modalOverlay').addEventListener('click', e => { if(e.target.id === 'modalOverlay') closeTaskModal(); });
   document.addEventListener('keydown', e => {
-    if(e.key === 'Escape' && $('modalOverlay').style.display === 'flex') closeTaskModal();
+    if(e.key === 'Escape' && $('modalOverlay').style.display === 'flex'){ closeTaskModal(); return; }
+
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    const modalOpen = $('modalOverlay').style.display === 'flex';
+    if(modalOpen || typing) return;
+
+    if(e.key === '/'){
+      e.preventDefault();
+      $('searchBox').focus();
+    } else if(e.key === 'n' || e.key === 'N'){
+      e.preventDefault();
+      openTaskModal('create');
+    }
   });
 
   $('modalAdd').addEventListener('click', () => {
@@ -884,14 +979,19 @@
     if(modalMode === 'edit' && modalEditId){
       const t = tasks.find(t => t.id === modalEditId);
       Object.assign(t, {name, start, end, assignedBy, status, description});
+      save();
+      closeTaskModal();
+      renderAll();
+      showToast(`Saved changes to "${name}".`);
     } else {
       const id = uid();
       tasks.push({id, name, start, end, assignedBy, status, description, log: []});
       expandedIds.add(id); // open it right away so they can start logging
+      save();
+      closeTaskModal();
+      renderAll();
+      showToast(`Created "${name}".`);
     }
-    save();
-    closeTaskModal();
-    renderAll();
   });
 
   function editTask(id){ openTaskModal('edit', { id }); }
@@ -902,13 +1002,56 @@
     t.status = newStatus;
     save();
     renderAll();
+    showToast(`Marked "${t.name}" as ${statusLabel(newStatus).toLowerCase()}.`);
+  }
+
+  // ---- Toasts ----
+  function showToast(message, actionLabel, actionFn, duration){
+    const container = $('toastContainer');
+    const el = document.createElement('div');
+    el.className = 'toast';
+    const msgSpan = document.createElement('span');
+    msgSpan.textContent = message;
+    el.appendChild(msgSpan);
+    if(actionLabel && actionFn){
+      const btn = document.createElement('button');
+      btn.textContent = actionLabel;
+      btn.onclick = () => { actionFn(); el.remove(); };
+      el.appendChild(btn);
+    }
+    container.appendChild(el);
+    setTimeout(() => { el.remove(); }, duration || 5000);
   }
 
   function deleteTask(id){
-    tasks = tasks.filter(t => t.id !== id);
+    const idx = tasks.findIndex(t => t.id === id);
+    if(idx === -1) return;
+    const [removed] = tasks.splice(idx, 1);
     expandedIds.delete(id);
     save();
     renderAll();
+    showToast(`Deleted "${removed.name}".`, 'Undo', () => {
+      tasks.splice(idx, 0, removed);
+      save();
+      renderAll();
+    }, 6000);
+  }
+
+  function duplicateTask(id){
+    const t = tasks.find(t => t.id === id);
+    if(!t) return;
+    const copy = {
+      ...JSON.parse(JSON.stringify(t)),
+      id: uid(),
+      name: t.name + ' (copy)',
+      log: []
+    };
+    const idx = tasks.findIndex(x => x.id === id);
+    tasks.splice(idx + 1, 0, copy);
+    expandedIds.add(copy.id);
+    save();
+    renderAll();
+    showToast(`Duplicated as "${copy.name}".`);
   }
 
   function toggleExpand(id){
@@ -992,9 +1135,20 @@
     return escaped.replace(new RegExp(escapedQ, 'ig'), match => `<mark>${match}</mark>`);
   }
 
+  function getBaseFilteredTasks(){
+    // "base" = filtered by search + period, but NOT by status —
+    // so the stat chips can show what each status would total within the current period/search.
+    const query = ($('searchBox').value || '').trim();
+    let items = [...tasks];
+    if(query) items = items.filter(t => taskMatchesSearch(t, query));
+    items = items.filter(taskMatchesPeriod);
+    return items;
+  }
+
   function renderStatsBar(){
-    const counts = { all: tasks.length, pending: 0, progress: 0, done: 0 };
-    tasks.forEach(t => { if(counts[t.status] !== undefined) counts[t.status]++; });
+    const base = getBaseFilteredTasks();
+    const counts = { all: base.length, pending: 0, progress: 0, done: 0 };
+    base.forEach(t => { if(counts[t.status] !== undefined) counts[t.status]++; });
     const current = $('filterStatus').value;
     const chips = [
       { key: 'all', label: 'All tasks', color: 'var(--ink-dim)' },
@@ -1027,14 +1181,12 @@
   function renderList(){
     renderStatsBar();
     const filter = $('filterStatus').value;
-    const query = ($('searchBox').value || '').trim();
     const sortOrder = $('sortOrder').value;
     const container = $('logContainer');
-    let items = [...tasks];
+    let items = getBaseFilteredTasks();
     if(filter !== 'all') items = items.filter(t => t.status === filter);
-    if(query) items = items.filter(t => taskMatchesSearch(t, query));
-    items = items.filter(taskMatchesPeriod);
     items = sortItems(items, sortOrder);
+    const query = ($('searchBox').value || '').trim();
 
     if(items.length === 0){
       container.innerHTML = `<div class="empty">${query || filter !== 'all' ? 'No tasks match.' : 'No tasks yet — click "+ Create task" to add one.'}</div>`;
@@ -1057,17 +1209,19 @@
       `).join('');
 
       const overdue = t.end && t.end < toISO(new Date()) && t.status !== 'done';
+      const progressPct = timeProgressPercent(t);
 
       return `
       <div class="entry ${t.status} ${isOpen ? 'expanded' : ''}">
         <div class="entry-header entry-top" onclick="toggleExpand('${t.id}')">
-          <div>
+          <div style="flex:1;">
             <div class="entry-name">${highlight(t.name, query)}</div>
             <div class="entry-meta">
               <span class="entry-dates">${fmtDate(t.start)} → ${fmtDate(t.end)}</span>
               ${t.assignedBy ? `<span class="entry-assigned">Assigned by: ${highlight(t.assignedBy, query)}</span>` : ''}
               ${overdue ? `<span class="overdue-badge">Overdue</span>` : ''}
             </div>
+            ${progressPct !== null ? `<div class="progress-track"><div class="progress-fill ${t.status}" style="width:${progressPct}%"></div></div>` : ''}
           </div>
           <div style="display:flex; align-items:center;" onclick="event.stopPropagation()">
             <select class="status-select pill-select ${t.status}" onchange="updateTaskStatus('${t.id}', this.value)">
@@ -1082,6 +1236,7 @@
           ${t.description ? `<div class="entry-notes">${highlight(t.description, query)}</div>` : ''}
           <div class="entry-actions">
             <button onclick="event.stopPropagation(); editTask('${t.id}')">Edit</button>
+            <button onclick="event.stopPropagation(); duplicateTask('${t.id}')">Duplicate</button>
             <button class="delete" onclick="event.stopPropagation(); deleteTask('${t.id}')">Delete</button>
           </div>
           <div class="task-log" onclick="event.stopPropagation()">
